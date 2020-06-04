@@ -19,22 +19,30 @@ package org.wildfly.security.examples;
 
 import static org.wildfly.security.password.interfaces.ClearPassword.ALGORITHM_CLEAR;
 
+import java.io.IOException;
 import java.security.Provider;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.wildfly.elytron.web.undertow.server.ElytronContextAssociationHandler;
 import org.wildfly.elytron.web.undertow.server.ElytronRunAsHandler;
 import org.wildfly.security.WildFlyElytronProvider;
+import org.wildfly.security.audit.AuditLogger;
+import org.wildfly.security.audit.EventPriority;
+import org.wildfly.security.audit.JsonSecurityEventFormatter;
+import org.wildfly.security.audit.SyslogAuditEndpoint;
 import org.wildfly.security.auth.permission.LoginPermission;
 import org.wildfly.security.auth.realm.SimpleMapBackedSecurityRealm;
 import org.wildfly.security.auth.realm.SimpleRealmEntry;
-import org.wildfly.security.auth.server.HttpAuthenticationFactory;
+import org.wildfly.security.auth.server.http.HttpAuthenticationFactory;
 import org.wildfly.security.auth.server.MechanismConfiguration;
 import org.wildfly.security.auth.server.MechanismConfigurationSelector;
 import org.wildfly.security.auth.server.MechanismRealmConfiguration;
 import org.wildfly.security.auth.server.SecurityDomain;
+import org.wildfly.security.auth.server.event.SecurityEvent;
+import org.wildfly.security.auth.server.event.SecurityEventVisitor;
 import org.wildfly.security.credential.PasswordCredential;
 import org.wildfly.security.http.HttpAuthenticationException;
 import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
@@ -85,12 +93,26 @@ public class HelloWorld {
         simpleRealm.setPasswordMap(passwordMap);
 
         SecurityDomain.Builder builder = SecurityDomain.builder()
-                .setDefaultRealmName("TestRealm");
+                .setDefaultRealmName("TestRealm")
+                .setSecurityEventListener(createAuditEventListener());
 
         builder.addRealm("TestRealm", simpleRealm).build();
         builder.setPermissionMapper((principal, roles) -> PermissionVerifier.from(new LoginPermission()));
 
         return builder.build();
+    }
+
+    private static Consumer<SecurityEvent> createAuditEventListener() throws IOException {
+        final SecurityEventVisitor<?, String> formatter = JsonSecurityEventFormatter.builder().build();
+        return AuditLogger.builder()
+                .setPriorityMapper(m -> EventPriority.WARNING)
+                .setMessageFormatter(m -> m.accept(formatter, null))
+                .setAuditEndpoint(SyslogAuditEndpoint.builder()
+                        .setHostName("127.0.0.1")
+                        .setPort(514)
+                        .setTcp(true)
+                        .build())
+            .build();
     }
 
     private static HttpAuthenticationFactory createHttpAuthenticationFactory(final SecurityDomain securityDomain) {
