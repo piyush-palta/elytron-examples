@@ -95,8 +95,9 @@ public class GenerateBCryptPassword {
                 encodedHash = encoder.encodeToString(hash);
                 encodedSalt = encoder.encodeToString(salt);
             }
-            System.out.println("Encoded Hash = " + encodedHash);
-            System.out.println("Encoded Salt = " + encodedSalt);
+            System.out.println("Encoded Hash    = " + encodedHash);
+            System.out.println("Encoded Salt    = " + encodedSalt);
+            System.out.println("Iteration Count = " + iterationCount);
         }
     }
 }
